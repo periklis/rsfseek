@@ -98,6 +98,3 @@ pub fn run(root: &str, limit: usize) {
         println!("Filename: {} size: {}", item.0, item.1);
     }
 }
-
-#[cfg(test)]
-mod tests;
