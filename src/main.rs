@@ -7,15 +7,26 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     match args.len() {
-        3 => {
-            match args[1].parse::<String>() {
-                Ok(param) => {
-                    if param == "--path" {
-                        visitor::run(&args[2], 10);
-                    }
+        argc @ 3 ... 4 => {
+            let argv = if argc == 3 { [1,0] } else { [1,3] };
+            let mut path = String::from("");
+            let mut limit = 100;
+            let path_param = "--path";
+            let limit_param = "--limit";
+
+            for i in &argv {
+                match args[*i].parse::<String>() {
+                    Ok(ref param) if param == path_param => {
+                        path = args[i+1].parse::<String>().unwrap();
+                    },
+                    Ok(ref param) if param == limit_param => {
+                        limit = args[i+1].parse::<usize>().unwrap();
+                    },
+                    Ok(_) | Err(_) => {}
                 }
-                _ => println!("Unkonwn argument"),
             }
+
+            visitor::run(&path, limit);
         }
         1 ... 2 | _ => {
             help::usage();
