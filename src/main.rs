@@ -7,7 +7,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     match args.len() {
-        argc @ 3 ... 4 => {
+        argc @ 3 ... 5 => {
             let argv = if argc == 3 { [1,0] } else { [1,3] };
             let mut path = String::from("");
             let mut limit = 100;
