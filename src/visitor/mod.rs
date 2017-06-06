@@ -6,7 +6,7 @@ use std::thread;
 
 type ResVec = Vec<(String, u64)>;
 
-fn collect_files(path: &str, results: Arc<Mutex<ResVec>>) {
+fn collect_files(path: &str, results: &Arc<Mutex<ResVec>>) {
     let path = Path::new(path);
 
     for entry in path.read_dir().expect("Failed reading directory") {
@@ -59,11 +59,11 @@ fn visit_dir(str: &str, tx: &Sender<String>) -> Result<&'static str, &'static st
 }
 
 pub fn run(root: &str, limit: usize) {
-    println!("Scanning: {} for top {} files", root, limit);
+    println!("Scanning: {} for top {} biggest files", root, limit);
 
     let mut vec = ResVec::with_capacity(limit);
 
-    for i in 0..limit-1 {
+    for _ in 0..limit-1 {
         vec.push(("".to_string(), 0));
     }
 
@@ -71,28 +71,19 @@ pub fn run(root: &str, limit: usize) {
     let results = Arc::new(Mutex::new(vec));
     let (tx, rx) = channel::<String>();
 
-    let visit_handle = thread::spawn(move || {
+    let visitor = thread::spawn(move || {
         visit_dir(&root_dir, &tx).expect("Failed to visit root");
     });
 
     let file_results = results.clone();
-    let results_handle = thread::spawn(move || {
-        loop {
-            let dir = rx.recv();
-
-            if dir.is_err() {
-                break;
-            }
-
-            let next_dir = dir.unwrap();
-            let results_vec = file_results.clone();
-
-            collect_files(&next_dir, results_vec);
+    let collector = thread::spawn(move || {
+        for next in rx {
+            collect_files(&next, &file_results);
         }
     });
 
-    visit_handle.join();
-    results_handle.join();
+    visitor.join().expect("Failed joining visitor thread");
+    collector.join().expect("Failed joining collector thread");
 
     for item in results.lock().unwrap().iter() {
         println!("Filename: {} size: {}", item.0, item.1);
