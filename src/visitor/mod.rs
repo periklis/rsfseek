@@ -4,6 +4,10 @@ use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{Sender, channel};
 use std::thread;
 
+use prettytable::Table;
+use prettytable::row::Row;
+use prettytable::cell::Cell;
+
 type ResVec = Vec<(String, u64)>;
 
 fn collect_files(path: &str, results: &Arc<Mutex<ResVec>>) {
@@ -85,7 +89,12 @@ pub fn run(root: &str, limit: usize) {
     visitor.join().expect("Failed joining visitor thread");
     collector.join().expect("Failed joining collector thread");
 
+    let mut table = Table::new();
+    table.add_row(row!["Filename", "Size (Bytes)"]);
+
     for item in results.lock().unwrap().iter() {
-        println!("Filename: {} size: {}", item.0, item.1);
+        table.add_row(row![item.0, r->item.1]);
     }
+
+    table.printstd();
 }
