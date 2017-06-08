@@ -31,9 +31,9 @@ pub fn run(root: &str, limit: usize) {
     let (tx, rx) = channel::<PathBuf>();
 
     let visitor = thread::spawn(move || {
-        let visitor = DirectoryVisitor::new(&root_dir);
+        let visitor = DirectoryVisitor::new(&root_dir, true);
 
-        for dir in visitor {
+        for dir in visitor.expect("Visiting directory failed") {
             tx.send(dir).expect("Failed sending path buffer");
         }
     });

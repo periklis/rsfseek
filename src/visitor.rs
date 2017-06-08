@@ -1,49 +1,57 @@
-//use std::fmt;
+use std::fmt;
 use std::path::PathBuf;
-//use std::result;
+use std::result;
 
-// type Result<T> = result::Result<T, VisitError>;
+type Result<'a, T> = result::Result<T, DirVisitError<'a>>;
 
-// #[derive(Debug, PartialEq)]
-// pub enum VisitError {
-//     NotExist,
-//     NotDirectory,
-//     ReadDirFailed
-// }
+#[derive(Debug)]
+enum DirVisitError<'a> {
+    NotExists{path: &'a PathBuf}
+}
 
-// impl fmt::Display for VisitError {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         match *self {
-//             VisitError::NotExist => write!(f, "Directory does not exist for path"),
-//             VisitError::NotDirectory => write!(f, "Path is not a directory"),
-//             VisitError::ReadDirFailed => write!(f, "Reading directory for path failed")
-//         }
-//     }
-// }
+impl<'a> fmt::Display for DirVisitError<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            DirVisitError::NotExists{path} =>
+                write!(f, "Directory does not exists: {}", path.to_str().unwrap())
+        }
+    }
+}
 
 
 pub struct DirectoryVisitor {
-    dir_list: Vec<PathBuf>
+    dir_list: Vec<PathBuf>,
+    omit_hidden: bool
 }
 
 impl DirectoryVisitor {
-    pub fn new(path: &PathBuf) -> Self {
-        DirectoryVisitor{
-            dir_list: Self::read_dir(path)
+    pub fn new(path: &PathBuf, omit_hidden: bool) -> Option<Self> {
+        match Self::read_dir(path, true){
+            Ok(vec) => Some(DirectoryVisitor{
+                dir_list: vec,
+                omit_hidden: omit_hidden
+            }),
+            Err(_) => {
+                None
+            }
         }
     }
 
-    fn read_dir(path: &PathBuf) -> Vec<PathBuf> {
+    fn read_dir(path: &PathBuf, omit_hidden: bool) -> Result<Vec<PathBuf>> {
         match path.read_dir() {
             Err(_) => {
-                return vec![];
+                return Err(DirVisitError::NotExists{path: path});
             }
             Ok(dir) => {
-                return dir.filter(|d| d.is_ok())
-                    .map(|d| d.unwrap())
-                    .filter(|d| d.file_type().unwrap().is_dir())
-                    .map(|d| d.path())
-                    .collect();
+                return Ok(dir.filter(|d| d.is_ok())
+                          .map(|d| d.unwrap())
+                          .filter(|d| d.file_type().unwrap().is_dir())
+                          .filter(|d| !(omit_hidden && d.path()
+                                        .components().last().unwrap()
+                                        .as_os_str().to_str().unwrap()
+                                        .starts_with(".")))
+                          .map(|d| d.path())
+                          .collect());
             }
         }
     }
@@ -58,9 +66,16 @@ impl Iterator for DirectoryVisitor {
         }
 
         let next = self.dir_list.pop().unwrap();
-        self.dir_list.extend(Self::read_dir(&next).into_iter());
 
-        Some(next)
+        match Self::read_dir(&next, self.omit_hidden) {
+            Ok(vec) => {
+                self.dir_list.extend(vec.into_iter());
+                Some(next)
+            },
+            Err(_) => {
+                None
+            }
+        }
     }
 }
 
@@ -72,16 +87,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_visit_dir() {
-        let dirs = DirectoryVisitor::new("/Users/periklis/Projects/github");
+    fn it_visits_empty_dir() {
+        let dirs = DirectoryVisitor::new(&PathBuf::from("./src"), true);
         let expected: Vec<PathBuf> = vec![];
-        let actual: Vec<PathBuf> = dirs.collect();
+        let actual: Vec<PathBuf> = dirs.unwrap().collect();
 
         assert_eq!(expected, actual);
-        // let v = DirectoryIter::new("/Users/periklis/Projects/github/");
-        // let dirs = v.chi.collect::<Vec<String>>();
-        // let expc: Vec<String> = vec![];
+    }
 
-        // assert_eq!(expc, dirs);
+    #[test]
+    fn it_visits_existing_dir() {
+        let dirs = DirectoryVisitor::new(&PathBuf::from("./target"), true);
+        let expected = vec![
+            PathBuf::from("./target/debug"),
+            PathBuf::from("./target/debug/native"),
+            PathBuf::from("./target/debug/incremental"),
+            PathBuf::from("./target/debug/examples"),
+            PathBuf::from("./target/debug/deps"),
+            PathBuf::from("./target/debug/build")];
+        let actual: Vec<PathBuf> = dirs.unwrap().collect();
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    #[should_panic]
+    fn it_panics_on_not_existing_dir() {
+        let dirs = DirectoryVisitor::new(&PathBuf::from("./NOTEXISTING"), true);
+        let _: Vec<PathBuf> = dirs.expect("Panic on not existing").collect();
     }
 }
