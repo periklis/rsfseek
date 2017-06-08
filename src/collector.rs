@@ -23,7 +23,7 @@ impl<'a> TopFilesCollector<'a> {
                     let mut vec = self.results.lock().unwrap();
 
                     vec.sort_by(|l, r| {
-                        return r.1.cmp(&l.1);
+                        r.1.cmp(&l.1)
                     });
 
                     for i in vec.iter_mut() {

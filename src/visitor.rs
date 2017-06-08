@@ -40,18 +40,18 @@ impl DirectoryVisitor {
     fn read_dir(path: &PathBuf, omit_hidden: bool) -> Result<Vec<PathBuf>> {
         match path.read_dir() {
             Err(_) => {
-                return Err(DirVisitError::NotExists{path: path});
+                Err(DirVisitError::NotExists{path: path})
             }
             Ok(dir) => {
-                return Ok(dir.filter(|d| d.is_ok())
-                          .map(|d| d.unwrap())
-                          .filter(|d| d.file_type().unwrap().is_dir())
-                          .filter(|d| !(omit_hidden && d.path()
-                                        .components().last().unwrap()
-                                        .as_os_str().to_str().unwrap()
-                                        .starts_with(".")))
-                          .map(|d| d.path())
-                          .collect());
+                Ok(dir.filter(|d| d.is_ok())
+                   .map(|d| d.unwrap())
+                   .filter(|d| d.file_type().unwrap().is_dir())
+                   .filter(|d| !(omit_hidden && d.path()
+                                 .components().last().unwrap()
+                                 .as_os_str().to_str().unwrap()
+                                 .starts_with('.')))
+                   .map(|d| d.path())
+                   .collect())
             }
         }
     }
